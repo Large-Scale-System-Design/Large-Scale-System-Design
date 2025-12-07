@@ -18,7 +18,7 @@ const (
 	xEpoch = 1288834974657
 )
 
-type Generator struct {
+type SnowflakeIdGenerator struct {
 	mutex sync.Mutex
 	timestamp int64
 	datacenterId uint16
@@ -26,26 +26,35 @@ type Generator struct {
 	sequence uint16
 }
 
-func NewGenerator(datacenterId uint16, serverId uint16) *Generator {
-	return &Generator {
+func GetTimestampOfX() int64 {
+	return time.Now().UnixMilli() - xEpoch
+}
+
+func NewGenerator(datacenterId uint16, serverId uint16) *SnowflakeIdGenerator {
+	return &SnowflakeIdGenerator {
 		datacenterId: datacenterId,
 		serverId: serverId,
 	}
 }
 
-func (g *Generator) Update() {
+func (g *SnowflakeIdGenerator) Update() {
 	// Get current timestamp (from X epoch)
-	now := time.Now().UnixMilli() - xEpoch
+	now := GetTimestampOfX()
 
 	if g.timestamp != now {
 		g.sequence = 0
 		g.timestamp = now
 	} else {
-		g.sequence++
+		g.sequence = (g.sequence + 1) & ((uint16(1) << sequenceBits) - 1)
+		// Check for sequence conflicts
+		if g.sequence == 0 {
+			// Waiting for timestamp change
+			for ; now == g.timestamp; now = GetTimestampOfX() {}
+		}
 	}
 }
 
-func (g *Generator) Next() int64 {
+func (g *SnowflakeIdGenerator) Next() int64 {
 	var id int64 = 0
 	remain := int((unsafe.Sizeof(id) * 8) - 1)  // excludes sign bit(1)
 

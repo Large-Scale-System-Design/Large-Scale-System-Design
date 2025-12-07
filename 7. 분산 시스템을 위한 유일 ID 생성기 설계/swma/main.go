@@ -26,6 +26,14 @@ type SnowflakeIdGenerator struct {
 	sequence uint16
 }
 
+func clampBitMaxU16(value uint16, bits int) uint16 {
+	return (value & ((uint16(1) << bits) - 1))
+}
+
+func clampBitMax64(value int64, bits int) int64 {
+	return (value & ((int64(1) << bits) - 1))
+}
+
 func GetTimestampOfX() int64 {
 	return time.Now().UnixMilli() - xEpoch
 }
@@ -45,7 +53,7 @@ func (g *SnowflakeIdGenerator) Update() {
 		g.sequence = 0
 		g.timestamp = now
 	} else {
-		g.sequence = (g.sequence + 1) & ((uint16(1) << sequenceBits) - 1)
+		g.sequence = clampBitMaxU16(g.sequence + 1, sequenceBits)
 		// Check for sequence conflicts
 		if g.sequence == 0 {
 			// Waiting for timestamp change
@@ -66,19 +74,19 @@ func (g *SnowflakeIdGenerator) Next() int64 {
 
 	// Push (current timestamp)
 	remain -= timestampBits
-	id |= (int64(g.timestamp) & ((int64(1) << timestampBits) - 1)) << remain
+	id |= clampBitMax64(int64(g.timestamp), timestampBits) << remain
 
 	// Push (Datacenter ID)
 	remain -= datacenterBits
-	id |= (int64(g.datacenterId) & ((int64(1) << datacenterBits) - 1)) << remain
+	id |= clampBitMax64(int64(g.datacenterId), datacenterBits) << remain
 
 	// Push (Server ID)
 	remain -= serverBits
-	id |= (int64(g.serverId) & ((int64(1) << serverBits) - 1)) << remain
+	id |= clampBitMax64(int64(g.serverId), serverBits) << remain
 
-	// Push (Code)
+	// Push (Sequence)
 	remain -= sequenceBits
-	id |= (int64(g.sequence) & ((int64(1) << sequenceBits) - 1)) << remain
+	id |= clampBitMax64(int64(g.sequence), sequenceBits) << remain
 
 	return id
 }

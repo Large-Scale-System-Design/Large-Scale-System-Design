@@ -1,0 +1,31 @@
+services:
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    restart: always
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - REDIS_ADDR=${REDIS_ADDR:-redis:6379} # .env에 없으면 기본값 redis:6379 사용
+    depends_on:
+      - redis
+
+  worker-email:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    environment:
+      - REDIS_ADDR=${REDIS_ADDR:-redis:6379}
+      - CHANNEL_TYPE=email
+      # .env 파일에서 읽어온 값을 컨테이너 내부 환경변수로 주입
+      - GMAIL_USER=${GMAIL_USER}
+      - GMAIL_PASS=${GMAIL_PASS}
+    depends_on:
+      - redis
+    restart: on-failure
